@@ -3,12 +3,12 @@
 # qc_munge.R  --  QC / harmonise cohort-level GWAS summary statistics with
 #                 MungeSumstats, then emit the consortium-standard columns.
 #
-# WHAT IT DOES (per cohort file)
+# The process (per cohort file)
 #   1. Runs MungeSumstats::format_sumstats() with the SGC QC filters
-#      (INFO >= 0.3, FRQ >= 0.005), harmonising to GRCh38 and to a single
+#      (INFO >= 0.3, FRQ >= 0.005), harmonising to a single
 #      allele convention. MungeSumstats auto-detects each cohort's (differing)
-#      column headers, so you do NOT have to pre-rename them.
-#   2. Reads the munged file back and rewrites it with EXACTLY the standard
+#      column headers, so we do not have to pre-rename them.
+#   2. Reads the munged file back and rewrites it with exact standard
 #      column names every SGC file must have:
 #         Chromosome  Position  Effect_allele  Non-effect_allele
 #         Beta  SE  P-value  Effect_AF  Imp_Quality
@@ -20,13 +20,12 @@
 #
 # RESUMABLE: a cohort whose output already exists is skipped (unless --force).
 #
+# ONE-OFF SETUP (installs MungeSumstats + references) -- run once, separately:
+#   Rscript qc_setup.R
+#
 # USAGE
 #   Rscript qc_munge.R --in cohort_files --out qc [options]
 #   Rscript qc_munge.R --in 'cohort_files/*.txt.gz' --out qc --threads 4
-#
-# ONE-OFF SETUP (installs MungeSumstats + the dbSNP/genome references it needs;
-# these are large, several GB, and download once):
-#   Rscript qc_munge.R --setup
 #
 # ---------------------------------------------------------------------------
 # ALLELE HANDLING
@@ -83,27 +82,7 @@ has_flag <- function(flag) flag %in% args
 
 if (has_flag("--help") || has_flag("-h")) {
   cat(readLines(sub("--file=", "",
-      grep("--file=", commandArgs(FALSE), value = TRUE)))[2:60], sep = "\n")
-  quit(status = 0)
-}
-
-# ------------------------------------------------------------------ one-off setup
-if (has_flag("--setup")) {
-  message(">> Installing MungeSumstats and its references (one-off, large).")
-  if (!requireNamespace("BiocManager", quietly = TRUE))
-    install.packages("BiocManager", repos = "https://cloud.r-project.org")
-  pkgs <- c("MungeSumstats", "data.table",
-            "SNPlocs.Hsapiens.dbSNP155.GRCh38",
-            "BSgenome.Hsapiens.NCBI.GRCh38",
-            "SNPlocs.Hsapiens.dbSNP155.GRCh37",
-            "BSgenome.Hsapiens.1000genomes.hs37d5")
-  for (p in pkgs) {
-    if (!requireNamespace(p, quietly = TRUE)) {
-      message("   installing ", p)
-      BiocManager::install(p, update = FALSE, ask = FALSE)
-    } else message("   ok ", p)
-  }
-  message(">> Setup complete.")
+      grep("--file=", commandArgs(FALSE), value = TRUE)))[2:44], sep = "\n")
   quit(status = 0)
 }
 
@@ -115,10 +94,10 @@ REFG    <- get_opt("--ref-genome", default = REF_GENOME_DEFAULT)
 FORCE   <- has_flag("--force")
 CHECK_N <- as.integer(get_opt("--check", default = "0"))
 
-# require the heavy packages only now (not for --help/--setup)
+# require the heavy packages (installed once by qc_setup.R)
 for (p in c("MungeSumstats", "data.table")) {
   if (!requireNamespace(p, quietly = TRUE))
-    stop(sprintf("Package '%s' is not installed. Run:  Rscript qc_munge.R --setup", p))
+    stop(sprintf("Package '%s' is not installed. Run the setup first:  Rscript qc_setup.R", p))
 }
 suppressWarnings(suppressMessages(library(data.table)))
 
@@ -195,13 +174,12 @@ standardise <- function(munged_path, out_path) {
   c_a1  <- pick(dt, c("A1"))
   c_a2  <- pick(dt, c("A2"))
   c_b   <- pick(dt, c("BETA"))
-  c_or  <- pick(dt, c("OR"))
   c_se  <- pick(dt, c("SE","STANDARD_ERROR"))
   c_p   <- pick(dt, c("P","PVAL","PVALUE","P_VALUE"))
   c_frq <- pick(dt, c("FRQ","FREQ","EAF","MAF","A2FREQ","A1FREQ"))
   c_inf <- pick(dt, c("INFO","IMPINFO","IMP_QUALITY","RSQ","R2"))
 
-  need <- c(CHR=c_chr, BP=c_bp, A1=c_a1, A2=c_a2, SE=c_se, P=c_p)
+  need <- c(CHR=c_chr, BP=c_bp, A1=c_a1, A2=c_a2, BETA=c_b, SE=c_se, P=c_p)
   if (any(is.na(need)))
     stop("munged file missing required column(s): ",
          paste(names(need)[is.na(need)], collapse = ", "))
@@ -210,16 +188,8 @@ standardise <- function(munged_path, out_path) {
   eff <- c_a1
   oth <- c_a2
 
-  # Beta: use BETA if present, else derive from OR (log-odds). MungeSumstats
-  # keeps it oriented to A1.
-  if (!is.na(c_b)) {
-    beta <- dt[[c_b]]
-  } else if (!is.na(c_or)) {
-    beta <- log(as.numeric(dt[[c_or]]))
-    message("    (no BETA column; derived Beta = log(OR))")
-  } else {
-    stop("munged file has neither BETA nor OR")
-  }
+  # Beta is always present and MungeSumstats keeps it oriented to A1.
+  beta <- dt[[c_b]]
 
   # Effect_AF = FRQ (already the A1 / effect-allele frequency).
   eaf <- if (!is.na(c_frq)) as.numeric(dt[[c_frq]]) else NA_real_
