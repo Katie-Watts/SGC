@@ -1,11 +1,11 @@
 # ==========================================================================
 # example_single.metal  --  fixed-effect, inverse-variance meta-analysis
-#                           for ONE phenotype/stratum (edit for your run).
+#                           for ONE phenotype/stratum.
 #
 # Run:
 #   # METAL cannot read gzip -- decompress the QC'd inputs first:
-#   gzip -dc qc/ATOPIC_DERM_EUR_biobankX.tsv.gz > biobankX.tsv
-#   gzip -dc qc/ATOPIC_DERM_EUR_cohortY.tsv.gz   > cohortY.tsv
+#   gzip -dc qc/ATOPIC_DERM_EUR_BIOBANK1.tsv.gz > BIOBANK1.tsv
+#   gzip -dc qc/ATOPIC_DERM_EUR_BIOBANK2.tsv.gz   > BIOBANK2.tsv
 #   metal < example_single.metal
 # ==========================================================================
 
@@ -22,9 +22,9 @@ STDERR    SE
 PVALUE    P-value
 
 # --- the cohorts to combine (add one PROCESS line per cohort) ---
-PROCESS   biobankX.tsv
-PROCESS   cohortY.tsv
+PROCESS   BIOBANK1.tsv
+PROCESS   BIOBANK2.tsv
 
 OUTFILE   ATOPIC_DERM_EUR_ .tbl
-ANALYZE                  # use  ANALYZE HETEROGENEITY  for I^2 / Q stats
+ANALYZE                  # HETEROGENEITY stats
 QUIT
