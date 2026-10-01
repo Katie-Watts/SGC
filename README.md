@@ -8,4 +8,4 @@ Assumption: cohort level files are/can be named in convention cohort_PHENO_strat
 3. Run run_metal.py (METAL_example_single.metal for example of single run)
 
 
-   sgc_pipeline contains everything needed to regenerate excel doc + downstream analyses.
+Post-processing: sgc_pipeline contains everything needed to regenerate excel doc + downstream analyses.
