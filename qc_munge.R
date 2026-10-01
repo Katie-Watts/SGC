@@ -5,13 +5,18 @@
 #
 # The process (per cohort file)
 #   1. Runs MungeSumstats::format_sumstats() with the SGC QC filters
-#      (INFO >= 0.3, FRQ >= 0.005). MungeSumstats auto-detects each cohort's (potentially differing?)
-#      column headers, so we do not have to pre-rename them.
-#   2. Reads the munged file back and rewrites it with standard
-#      column names plus a leading SNP_ID column (Chromosome:Position:Effect_allele:
-#      Non-effect_allele) that METAL uses as the marker key in the next step.
-#   3. Writes <out_dir>/<same basename>.tsv.gz  (tab-separated, gzipped). Drew needs to edit for whatever they need to be called.
-#      
+#      (INFO >= 0.3, FRQ >= 0.005). Column headers are auto-detected from
+#      MungeSumstats' default map (effect_AF is mapped to FRQ explicitly as not a default option), so
+#      cohort files don't need pre-renaming. Each cohort's genome build is
+#      inferred and lifted to GRCh38; missing RSIDs are filled from dbSNP 155
+#      (variants not in dbSNP are still kept).
+#   2. Reads the munged file back and rewrites it with standard column names
+#      plus a leading SNP_ID column
+#      (Chromosome:Position:Effect_allele:Non-effect_allele) that METAL uses
+#      as the marker key in the next step.
+#   3. Writes <out_dir>/<same basename>.tsv.gz (tab-separated, gzipped).
+#      Drew - Rename files if needed.
+#
 # RESUMABLE: a cohort whose output already exists is skipped (unless --force).
 #
 # ONE-OFF SETUP (installs MungeSumstats + references) -- run once, separately:
@@ -21,14 +26,24 @@
 #   Rscript qc_munge.R --in cohort_files --out qc [options]
 #   Rscript qc_munge.R --in 'cohort_files/*.txt.gz' --out qc --threads 4
 #
-# ---------------------------------------------------------------------------
+# OPTIONS
+#   --in PATH           directory, single file, or quoted glob (default: cohort_files)
+#   --out DIR           output directory (default: qc)
+#   --threads N         threads for MungeSumstats (default: 1)
+#   --mapping FILE      extra header map (.csv/.tsv/.xlsx; Uncorrected,Corrected)
+#   --ref-genome BUILD  force input build (GRCh37/GRCh38); default: infer per file
+#   --force             re-run cohorts whose output already exists
+#   --check N           (default 0 = off)
+#   -h, --help          show this header
+###############################################################################
 
 # QC filters (SGC standard)
 INFO_FILTER <- 0.3
 FRQ_FILTER  <- 0.005
 
 # Genome build handling: infer each cohort's build, then lift everything to
-# GRCh38 so all cohorts share coordinates before meta-analysis (backup only as Drew's code should handle this)
+# GRCh38 so all cohorts share coordinates before meta-analysis (backup only;
+# cohorts were asked to supply GRCh38).
 REF_GENOME_DEFAULT <- NULL       # NULL = let MungeSumstats infer per file
 CONVERT_REF_TO     <- "GRCh38"   # target build for all outputs
 DBSNP_BUILD        <- 155        # dbSNP reference for SNP mapping
@@ -53,8 +68,10 @@ get_opt <- function(flag, default = NULL) {
 has_flag <- function(flag) flag %in% args
 
 if (has_flag("--help") || has_flag("-h")) {
-  cat(readLines(sub("--file=", "",
-      grep("--file=", commandArgs(FALSE), value = TRUE)))[2:44], sep = "\n")
+  lines <- readLines(sub("--file=", "",
+      grep("--file=", commandArgs(FALSE), value = TRUE)))
+  hdr_end <- which(!grepl("^#", lines))[1] - 1   # print the leading comment block only
+  cat(lines[2:hdr_end], sep = "\n")
   quit(status = 0)
 }
 
@@ -96,6 +113,9 @@ message(sprintf("Found %d cohort file(s).", length(files)))
 # non_effect_allele -> A1). NB: in MungeSumstats A2 is the EFFECT allele, and
 # BETA / FRQ are relative to A2 after alignment to the reference.
 mapping_file <- MungeSumstats::sumstatsColHeaders
+# make sure the SGC frequency header is recognised as FRQ (effect-allele freq)
+mapping_file <- unique(rbind(mapping_file,
+                             data.frame(Uncorrected = "EFFECT_AF", Corrected = "FRQ")))
 
 # optional extra mappings (--mapping) for oddities the defaults miss,
 # e.g. a "standard error" column with a space. Two columns: Uncorrected, Corrected.
@@ -114,7 +134,8 @@ if (!is.null(MAPPING)) {
 }
 
 # ------------------------------------------------------------------ standardise
-# Munged files always use MungeSumstats' standard names, but can set to whatever we prefer
+# Munged files always use MungeSumstats' standard names, so only a few
+# fallbacks are needed.
 pick <- function(dt, candidates) {
   hit <- intersect(candidates, names(dt))
   if (length(hit)) hit[1] else NA_character_
