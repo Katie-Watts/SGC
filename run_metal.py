@@ -101,7 +101,7 @@ def write_manifest(path, groups, unmatched):
  
  
 def write_metal_script(script_path, member_plain, out_prefix,
-                       heterogeneity=False, genomic_control=False):
+                       heterogeneity=True, genomic_control=False):
     """Emit a METAL command script. member_plain are DECOMPRESSED file paths
     (METAL cannot read gzip). Columns are whitespace/tab tokens with no spaces,
     so the METAL default whitespace separator parses them fine."""
@@ -173,8 +173,9 @@ def main():
     ap.add_argument("--force", action="store_true", help="rebuild groups whose output exists")
     ap.add_argument("--threads", type=int, default=1,
                     help="parallel groups to run at once (default 1)")
-    ap.add_argument("--heterogeneity", action="store_true",
-                    help="add ANALYZE HETEROGENEITY (I^2 etc. in the .tbl)")
+    ap.add_argument("--heterogeneity", action=argparse.BooleanOptionalAction, default=True,
+                    help="ANALYZE HETEROGENEITY (I^2 etc. in the .tbl); on by default, "
+                         "turn off with --no-heterogeneity")
     ap.add_argument("--genomic-control", action="store_true",
                     help="apply METAL GENOMICCONTROL")
     ap.add_argument("--min-cohorts", type=int, default=1,
@@ -281,4 +282,3 @@ def main():
  
 if __name__ == "__main__":
     main()
-
