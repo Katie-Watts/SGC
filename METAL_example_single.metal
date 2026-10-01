@@ -2,7 +2,7 @@
 # example_single.metal  --  fixed-effect, inverse-variance meta-analysis
 #                           for ONE phenotype/stratum.
 #
-# Run:
+# Run: # JS: I thought METAL could read gzip, so this might not be necessary
 #   # METAL cannot read gzip -- decompress the QC'd inputs first:
 #   gzip -dc qc/ATOPIC_DERM_EUR_BIOBANK1.tsv.gz > BIOBANK1.tsv
 #   gzip -dc qc/ATOPIC_DERM_EUR_BIOBANK2.tsv.gz   > BIOBANK2.tsv
@@ -13,6 +13,10 @@ SCHEME   STDERR          # fixed-effect, inverse-variance weighted (beta + SE)
 AVERAGEFREQ ON           # carry a weighted Effect_AF into the output
 MINMAXFREQ  ON           # also report min/max freq across cohorts
 
+# --- JS: Define custom variables to track cases and controls ---
+CUSTOMVARIABLE Ncases
+CUSTOMVARIABLE Ncontrols
+
 # --- column names in the QC'd files (from qc_munge.R) ---
 MARKER    SNP_ID
 ALLELE    Effect_allele Non-effect_allele
@@ -20,6 +24,10 @@ FREQLABEL Effect_AF
 EFFECT    Beta
 STDERR    SE
 PVALUE    P-value
+
+# --- JS: Set the column labels ONCE globally ---
+LABEL Ncases AS Ncases
+LABEL Ncontrols AS Ncontrols
 
 # --- the cohorts to combine (add one PROCESS line per cohort) ---
 PROCESS   BIOBANK1.tsv
