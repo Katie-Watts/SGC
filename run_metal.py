@@ -9,8 +9,8 @@ WHAT IT DOES
        together.
     2. Writes a METAL command script per group (SCHEME STDERR = fixed-effect,
        inverse-variance weighted).
-    3. Runs METAL (with --run) a
-       gzipped as meta/<PHENO>_<STRATUM>.tsv.gz.
+    3. Runs METAL (with --run) outputs results as
+       gzipped meta/<PHENO>_<STRATUM>.tsv.gz.
 
 SAFE BY DEFAULT: without --run it only parses filenames, writes the grouping
 manifest (meta/metal_groups.tsv) and the METAL scripts, as a check before running. 
@@ -19,19 +19,17 @@ RESUMABLE: a group whose final meta/<key>.tsv.gz already exists is skipped
 (unless --force).
 
 GROUPING
-    Default: the key is  <pheno>_<stratum>  read from the START of the basename,
-    with any trailing cohort tag ignored, e.g.
-        ATOPIC_DERM_EUR_biobankX.tsv.gz     -> ATOPIC_DERM_EUR
-        PSORIASIS_ALL.cohortY.txt.gz        -> PSORIASIS_ALL
-    Strata recognised: ALL EUR AFR AMR EAS SAS MALE FEMALE.
-    If your cohort tag comes FIRST (cohortX_ATOPIC_DERM_EUR...), pass your own
-    --group-regex with named groups 'pheno' and 'stratum', e.g.
-        --group-regex '^[^_]+_(?P<pheno>.+)_(?P<stratum>ALL|EUR|AFR|AMR|EAS|SAS|MALE|FEMALE)$'
-
+    Strata recognised: ALL EUR AFR AMR EAS SAS MALE FEMALE
+    
+    Default: assumes files are named  <cohort>_<pheno>_<stratum>. The cohort tag is the
+    first token (no underscores or dots in it) and is ignored; the key is
+    <pheno>_<stratum>, with the stratum at the END of the basename, e.g.
+        biobank_ATOPIC_DERM_EUR.tsv.gz     -> ATOPIC_DERM_EUR
+        cohort_PSORIASIS_ALL.txt.gz        -> PSORIASIS_ALL    
 USAGE
     # 1) check the grouping (writes manifest + scripts, runs nothing)
     python3 run_metal.py --in qc --out meta
-    # 2) run it
+    # 2) run!!
     python3 run_metal.py --in qc --out meta --run --metal ./metal --threads 4
 """
 
@@ -58,9 +56,8 @@ COL_P      = "P-value"
 COL_FREQ   = "Effect_AF"
  
 DEFAULT_GROUP_RE = (
-    r"^(?P<pheno>.+?)_(?P<stratum>" + "|".join(STRATA) + r")(?:[._].*)?$"
+    r"^(?P<cohort>[^_.]+)[_.](?P<pheno>.+)_(?P<stratum>" + "|".join(STRATA) + r")$"
 )
- 
  
 def basename_stem(path):
     b = os.path.basename(path)
@@ -284,4 +281,4 @@ def main():
  
 if __name__ == "__main__":
     main()
- 
+
