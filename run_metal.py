@@ -3,26 +3,17 @@
 run_metal.py -- fixed-effect (inverse-variance) meta-analysis of QC'd cohort
 files with METAL, one meta per PHENOTYPE_STRATUM.
 
-PIPELINE POSITION
-    cohort_files/  --qc_munge.R-->  qc/<cohort>.tsv.gz  --THIS-->  meta/<PHENO>_<STRATUM>.tsv.gz
-    which is exactly the <PHENOTYPE>_<STRATUM>.tsv.gz that the clumping /
-    downstream pipeline consumes.
-
 WHAT IT DOES
     1. Groups the QC'd cohort files by a key parsed from their filename
-       (phenotype + stratum). Cohorts that share a key are meta-analysed
+       (phenotype + stratum). Assuming these are named as such?? Or Drew can remap to these. Cohorts that share a key are meta-analysed
        together.
     2. Writes a METAL command script per group (SCHEME STDERR = fixed-effect,
        inverse-variance weighted).
-    3. Runs METAL (with --run) and rewrites each result to the consortium
-       standard columns:
-         Chromosome Position Effect_allele Non-effect_allele
-         Beta SE P-value Effect_AF Imp_Quality
+    3. Runs METAL (with --run) a
        gzipped as meta/<PHENO>_<STRATUM>.tsv.gz.
 
 SAFE BY DEFAULT: without --run it only parses filenames, writes the grouping
-manifest (meta/metal_groups.tsv) and the METAL scripts, so you can eyeball the
-groups before committing. Add --run once the grouping looks right.
+manifest (meta/metal_groups.tsv) and the METAL scripts, as a check before running. 
 
 RESUMABLE: a group whose final meta/<key>.tsv.gz already exists is skipped
 (unless --force).
@@ -54,9 +45,9 @@ import subprocess
 import sys
 import tempfile
 from collections import OrderedDict
-
+ 
 STRATA = ["ALL", "EUR", "AFR", "AMR", "EAS", "SAS", "MALE", "FEMALE"]
-
+ 
 # standard column names in the QC'd inputs (what qc_munge.R writes)
 COL_MARKER = "SNP_ID"
 COL_EA     = "Effect_allele"
@@ -65,29 +56,25 @@ COL_BETA   = "Beta"
 COL_SE     = "SE"
 COL_P      = "P-value"
 COL_FREQ   = "Effect_AF"
-
+ 
 DEFAULT_GROUP_RE = (
     r"^(?P<pheno>.+?)_(?P<stratum>" + "|".join(STRATA) + r")(?:[._].*)?$"
 )
-
-# final meta output columns, in order
-OUT_COLS = ["Chromosome", "Position", "Effect_allele", "Non-effect_allele",
-            "Beta", "SE", "P-value", "Effect_AF", "Imp_Quality"]
-
-
+ 
+ 
 def basename_stem(path):
     b = os.path.basename(path)
     return re.sub(r"\.(tsv|txt|csv)(\.gz)?$", "", b, flags=re.I)
-
-
+ 
+ 
 def discover(indir):
     files = []
     for pat in ("*.tsv.gz", "*.txt.gz", "*.tsv", "*.txt"):
         files += glob.glob(os.path.join(indir, pat))
     files = [f for f in files if not os.path.basename(f).startswith("._")]
     return sorted(set(files))
-
-
+ 
+ 
 def group_files(files, group_re):
     rx = re.compile(group_re)
     groups, unmatched = OrderedDict(), []
@@ -104,8 +91,8 @@ def group_files(files, group_re):
             key = f"{pheno}_{stratum}"
         groups.setdefault(key, []).append(f)
     return groups, unmatched
-
-
+ 
+ 
 def write_manifest(path, groups, unmatched):
     with open(path, "w") as fh:
         fh.write("group_key\tn_cohorts\tcohort_files\n")
@@ -114,8 +101,8 @@ def write_manifest(path, groups, unmatched):
                      f"{','.join(os.path.basename(m) for m in members)}\n")
         for f in unmatched:
             fh.write(f"UNMATCHED\t0\t{os.path.basename(f)}\n")
-
-
+ 
+ 
 def write_metal_script(script_path, member_plain, out_prefix,
                        heterogeneity=False, genomic_control=False):
     """Emit a METAL command script. member_plain are DECOMPRESSED file paths
@@ -149,64 +136,31 @@ def write_metal_script(script_path, member_plain, out_prefix,
     ]
     with open(script_path, "w") as fh:
         fh.write("\n".join(lines))
-
-
+ 
+ 
 def find_tbl(out_prefix):
     hits = sorted(glob.glob(out_prefix + "*.tbl"))
     return hits[-1] if hits else None
-
-
-def postprocess(tbl_path, final_path):
-    """METAL .tbl (SCHEME STDERR, AVERAGEFREQ/MINMAXFREQ ON) -> standard cols.
-    Allele1 is the effect allele (Effect is oriented to it); METAL lowercases
-    alleles, so we upper-case them back. Chromosome/Position come from the
-    MarkerName (== SNP_ID = chr:pos:EA:NEA)."""
-    with open(tbl_path) as fh:
-        header = fh.readline().rstrip("\n").split("\t")
-        idx = {c.lower(): i for i, c in enumerate(header)}
-
-        def col(*names):
-            for n in names:
-                if n.lower() in idx:
-                    return idx[n.lower()]
-            return None
-
-        i_mk = col("MarkerName")
-        i_a1 = col("Allele1"); i_a2 = col("Allele2")
-        i_ef = col("Effect");  i_se = col("StdErr")
-        i_p  = col("P-value", "Pvalue")
-        i_fr = col("Freq1")
-        if None in (i_mk, i_a1, i_a2, i_ef, i_se, i_p):
-            raise ValueError(f"unexpected METAL header in {tbl_path}: {header}")
-
-        n = 0
-        with gzip.open(final_path, "wt", compresslevel=6) as out:
-            out.write("\t".join(OUT_COLS) + "\n")
-            for line in fh:
-                p = line.rstrip("\n").split("\t")
-                if len(p) <= i_p:
-                    continue
-                marker = p[i_mk]
-                bits = marker.split(":")
-                chrom = bits[0] if len(bits) >= 1 else "NA"
-                pos   = bits[1] if len(bits) >= 2 else "NA"
-                ea    = p[i_a1].upper()
-                nea   = p[i_a2].upper()
-                eaf   = p[i_fr] if (i_fr is not None and i_fr < len(p)) else "NA"
-                row = [chrom, pos, ea, nea, p[i_ef], p[i_se], p[i_p], eaf, "NA"]
-                out.write("\t".join(row) + "\n")
-                n += 1
-    return n
-
-
+ 
+ 
+def gzip_tbl(tbl_path, final_path):
+    """Copy the METAL .tbl unchanged into a gzipped file; return variant count."""
+    n = 0
+    with open(tbl_path, "rb") as fi, gzip.open(final_path, "wb", compresslevel=6) as fo:
+        for line in fi:
+            fo.write(line)
+            n += 1
+    return max(n - 1, 0)   # minus header
+ 
+ 
 def decompress_to(src, dst):
     if src.endswith(".gz"):
         with gzip.open(src, "rb") as fi, open(dst, "wb") as fo:
             shutil.copyfileobj(fi, fo)
     else:
         shutil.copy2(src, dst)
-
-
+ 
+ 
 def main():
     ap = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -231,18 +185,18 @@ def main():
     ap.add_argument("--keep-tmp", action="store_true",
                     help="keep decompressed inputs and raw .tbl files")
     args = ap.parse_args()
-
+ 
     files = discover(args.indir)
     if not files:
         sys.exit(f"No QC'd files found in {args.indir}")
     groups, unmatched = group_files(files, args.group_regex)
-
+ 
     os.makedirs(args.outdir, exist_ok=True)
     scripts_dir = os.path.join(args.outdir, "metal_scripts"); os.makedirs(scripts_dir, exist_ok=True)
     raw_dir     = os.path.join(args.outdir, "metal_raw");     os.makedirs(raw_dir, exist_ok=True)
     manifest = os.path.join(args.outdir, "metal_groups.tsv")
     write_manifest(manifest, groups, unmatched)
-
+ 
     print(f"Discovered {len(files)} QC'd file(s) -> {len(groups)} group(s).")
     for key, members in groups.items():
         print(f"  {key}: {len(members)} cohort(s)")
@@ -250,7 +204,7 @@ def main():
         print(f"  !! {len(unmatched)} file(s) did not match the grouping regex "
               f"(listed as UNMATCHED in {manifest}); adjust --group-regex.")
     print(f"Manifest: {manifest}")
-
+ 
     metal_bin = shutil.which(args.metal) or (args.metal if os.path.exists(args.metal) else None)
     if not args.run:
         # still write the scripts so they can be inspected / run by hand
@@ -268,10 +222,10 @@ def main():
         if not metal_bin:
             print(f"(note: METAL binary '{args.metal}' not found on PATH — set --metal when you run.)")
         return
-
+ 
     if not metal_bin:
         sys.exit(f"METAL binary not found: {args.metal} (set --metal /path/to/metal)")
-
+ 
     tmp_root = tempfile.mkdtemp(prefix="metal_", dir=args.outdir)
     n_done = n_skip = n_fail = 0
     try:
@@ -282,19 +236,19 @@ def main():
             final_path = os.path.join(args.outdir, f"{key}.tsv.gz")
             if os.path.exists(final_path) and not args.force:
                 print(f"[skip] {key} (output exists)"); n_skip += 1; continue
-
+ 
             # decompress cohort files for METAL
             gdir = os.path.join(tmp_root, key); os.makedirs(gdir, exist_ok=True)
             plain = []
             for m in members:
                 d = os.path.join(gdir, basename_stem(m) + ".tsv")
                 decompress_to(m, d); plain.append(d)
-
+ 
             sp = os.path.join(scripts_dir, f"{key}.metal")
             out_prefix = os.path.join(raw_dir, f"{key}_")
             write_metal_script(sp, plain, out_prefix,
                                args.heterogeneity, args.genomic_control)
-
+ 
             print(f"[metal] {key} ({len(members)} cohorts)")
             with open(sp) as fh:
                 r = subprocess.run([metal_bin], stdin=fh,
@@ -305,27 +259,29 @@ def main():
             if r.returncode != 0:
                 print(f"    [FAIL] METAL exit {r.returncode}; see {log_path}")
                 n_fail += 1; continue
-
+ 
             tbl = find_tbl(out_prefix)
             if not tbl:
                 print(f"    [FAIL] no .tbl produced; see {log_path}")
                 n_fail += 1; continue
             try:
-                n = postprocess(tbl, final_path)
+                n = gzip_tbl(tbl, final_path)
             except Exception as e:
-                print(f"    [FAIL] postprocess: {e}"); n_fail += 1; continue
+                print(f"    [FAIL] gzip of METAL output: {e}"); n_fail += 1; continue
             print(f"    [ok] {os.path.basename(final_path)}  ({n:,} variants)")
             n_done += 1
-
+ 
             if not args.keep_tmp:
                 shutil.rmtree(gdir, ignore_errors=True)
+                os.remove(tbl)   # gzipped copy is now in the output dir
     finally:
         if not args.keep_tmp:
             shutil.rmtree(tmp_root, ignore_errors=True)
-
+ 
     print(f"\nDONE.  {n_done} meta-analyses, {n_skip} skipped, {n_fail} failed. "
           f"Output -> {args.outdir}/")
-
-
+ 
+ 
 if __name__ == "__main__":
     main()
+ 
