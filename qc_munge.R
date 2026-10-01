@@ -5,16 +5,13 @@
 #
 # The process (per cohort file)
 #   1. Runs MungeSumstats::format_sumstats() with the SGC QC filters
-#      (INFO >= 0.3, FRQ >= 0.005), harmonising to a single
-#      allele convention. MungeSumstats auto-detects each cohort's (differing)
+#      (INFO >= 0.3, FRQ >= 0.005). MungeSumstats auto-detects each cohort's (potentially differing?)
 #      column headers, so we do not have to pre-rename them.
 #   2. Reads the munged file back and rewrites it with standard
 #      column names plus a leading SNP_ID column (Chromosome:Position:Effect_allele:
 #      Non-effect_allele) that METAL uses as the marker key in the next step.
-#   3. Writes <out_dir>/<same basename>.tsv.gz  (tab-separated, gzipped).
-#      Keeping the input basename is what lets run_metal.py group cohorts of
-#      the same PHENOTYPE_STRATUM together.
-#
+#   3. Writes <out_dir>/<same basename>.tsv.gz  (tab-separated, gzipped). Drew needs to edit for whatever they need to be called.
+#      
 # RESUMABLE: a cohort whose output already exists is skipped (unless --force).
 #
 # ONE-OFF SETUP (installs MungeSumstats + references) -- run once, separately:
