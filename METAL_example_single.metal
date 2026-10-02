@@ -23,10 +23,11 @@ PVALUE    P-value
 LABEL Ncases AS N_CAS
 LABEL Ncontrols AS N_CON
 
-# --- the cohorts to combine (add one PROCESS line per cohort) ---
-PROCESS   BIOBANK1.tsv
+# --- the cohorts to combine (add one PROCESS line per cohort), can handle .gz files or uncompressed ---
+PROCESS   BIOBANK1.tsv.gz
 PROCESS   BIOBANK2.tsv
+PROCESS   BIOBANK3.tsv.gz
 
-OUTFILE   ATOPIC_DERM_EUR_ .tbl
+OUTFILE   ATOPIC_DERM_EUR.tbl
 ANALYZE HETEROGENEITY                 
 QUIT
