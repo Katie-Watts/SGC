@@ -20,8 +20,8 @@ STDERR    SE
 PVALUE    P-value
 
 # --- Set the column labels ONCE globally ---
-LABEL Ncases AS Ncases
-LABEL Ncontrols AS Ncontrols
+LABEL Ncases AS N_CAS
+LABEL Ncontrols AS N_CON
 
 # --- the cohorts to combine (add one PROCESS line per cohort) ---
 PROCESS   BIOBANK1.tsv
