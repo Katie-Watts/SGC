@@ -1,6 +1,7 @@
 # ==========================================================================
 # example_single.metal  --  fixed-effect, inverse-variance meta-analysis
 #                           for ONE phenotype/stratum.
+# run using: metal example_single.metal
 # ==========================================================================
 
 SCHEME   STDERR          # fixed-effect, inverse-variance weighted (beta + SE)
@@ -25,7 +26,7 @@ LABEL Ncontrols AS N_CON
 
 # --- the cohorts to combine (add one PROCESS line per cohort), can handle .gz files or uncompressed ---
 PROCESS   BIOBANK1.tsv.gz
-PROCESS   BIOBANK2.tsv
+PROCESS   cohort_files/BIOBANK2.tsv
 PROCESS   BIOBANK3.tsv.gz
 
 OUTFILE   ATOPIC_DERM_EUR_ .tbl
