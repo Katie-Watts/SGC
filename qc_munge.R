@@ -154,7 +154,7 @@ standardise <- function(munged_path, out_path) {
   ea  <- toupper(dt$A2)   # A2 = effect allele (MungeSumstats convention)
   oa  <- toupper(dt$A1)   # A1 = non-effect / reference allele
 
-  #Rename ouptut columns as needed / whatever we want 
+  #Rename ouptut columns as needed / whatever we want but will then need updating in METAL script if changed
   out <- data.table::data.table( 
     SNP_ID              = paste(chr, dt$BP, ea, oa, sep = ":"),
     Chromosome          = chr,
