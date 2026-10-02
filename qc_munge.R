@@ -37,7 +37,7 @@
 #   -h, --help          show this header
 ###############################################################################
 
-# QC filters (SGC standard)
+# QC filters to impose(SGC standard)
 INFO_FILTER <- 0.3
 FRQ_FILTER  <- 0.005
 
