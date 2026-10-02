@@ -1,7 +1,7 @@
 # SGC-QC
 QC pipeline for SGC GWAS data
 
-Assumption: cohort level files are/can be named in convention cohort_PHENO_stratum for processing throughout this (i.e use Jake's cohort names).
+Assumption: cohort level files are/can be named in convention cohort_PHENO_stratum for processing throughout this (i.e use Jake's cohort names). But totally fine to be changed - scripts will just need updating
 
 1. Run qc_setup
 2. Run qc_munge
