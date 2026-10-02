@@ -5,7 +5,7 @@ Assumption: cohort level files are/can be named in convention cohort_PHENO_strat
 
 1. Run qc_setup
 2. Run qc_munge
-3. Run METAL_example_single.metal (one script per meta-analysis)
+3. Run METAL (METAL_example_single.metal - shows the parameters we want across all runs).
 
 
 Code not for portal: Post-processing: sgc_pipeline contains everything needed to regenerate excel doc + downstream analyses.
