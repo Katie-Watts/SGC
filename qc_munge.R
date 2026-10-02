@@ -132,7 +132,7 @@ if (!is.null(MAPPING)) {
 }
 
 # ------------------------------------------------------------------ standardise
-# Munged files always use MungeSumstats' standard names, just need to check NA codings.
+# Need to check NA codings and capitalisation
 pick <- function(dt, candidates) {
   hit <- intersect(candidates, names(dt))
   if (length(hit)) hit[1] else NA_character_
