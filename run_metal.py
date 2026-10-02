@@ -4,7 +4,7 @@ run_metal.py -- fixed-effect (inverse-variance) meta-analysis of QC'd cohort fil
 
 WHAT IT DOES
     1. Groups the QC'd cohort files by a key parsed from their filename
-       (phenotype + stratum). Assuming these are named as such?? Or Drew can remap to this. Cohorts that share a key (PHENO_STRATUM) are meta-analysed
+       (phenotype + stratum).  Cohorts that share a key (PHENO_STRATUM) are meta-analysed -- ISSUE THAT SOMETIMES WE WANT SINGLE ANCESTRY GWAS ALSO INCLUDED IN THE ALL ANALYSES - SO NEED TO FIX FOR THAT. Would work for all other strata though.
        together.
     2. Writes a METAL command script per group (SCHEME STDERR = fixed-effect,
        inverse-variance weighted, with heterogeneity), summing Ncases and
