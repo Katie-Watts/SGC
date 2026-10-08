@@ -18,7 +18,7 @@
 #   3. Writes <out_dir>/<same basename>.tsv.gz (tab-separated, gzipped).
 #      Drew - Rename files if needed.
 #
-# RESUMABLE: a cohort whose output already exists is skipped (unless --force).
+# Every run processes all matched cohorts and overwrites existing outputs.
 #
 # ONE-OFF SETUP (installs MungeSumstats + references) -- run once, separately:
 #   Rscript qc_setup.R
@@ -33,8 +33,6 @@
 #   --threads N         threads for MungeSumstats (default: 1)
 #   --mapping FILE      extra header map (.csv/.tsv/.xlsx; Uncorrected,Corrected)
 #   --ref-genome BUILD  force input build (GRCh37/GRCh38); default: infer per file
-#   --force             re-run cohorts whose output already exists
-#   --check N           (default 0 = off)
 #   -h, --help          show this header
 ###############################################################################
 
@@ -80,8 +78,6 @@ OUT     <- get_opt("--out", default = "qc")
 THREADS <- as.integer(get_opt("--threads", default = "1"))
 MAPPING <- get_opt("--mapping", default = NULL)   # optional extra header map
 REFG    <- get_opt("--ref-genome", default = REF_GENOME_DEFAULT)
-FORCE   <- has_flag("--force")
-CHECK_N <- as.integer(get_opt("--check", default = "0"))
 
 # required packages (installed once by qc_setup.R)
 for (p in c("MungeSumstats", "data.table")) {
@@ -190,24 +186,16 @@ standardise <- function(munged_path, out_path) {
     N_CAS               = if (!is.na(c_cas)) as.numeric(dt[[c_cas]]) else NA_real_,
     N_CON               = if (!is.na(c_con)) as.numeric(dt[[c_con]]) else NA_real_
   )
-  # Write to a temp file and rename only once complete, so a crash mid-write
-  # never leaves a truncated output that the resume check would then skip.
-  tmp <- paste0(out_path, ".tmp")
-  data.table::fwrite(out, tmp, sep = "\t", quote = FALSE, na = "NA",
+  data.table::fwrite(out, out_path, sep = "\t", quote = FALSE, na = "NA",
                      compress = "gzip")
-  if (!file.rename(tmp, out_path))
-    stop("could not rename ", tmp, " to ", out_path)
   nrow(out)
 }
 
 # ------------------------------------------------------------------ main loop
-n_ok <- 0L; n_skip <- 0L; n_fail <- 0L; checked <- FALSE
+n_ok <- 0L; n_fail <- 0L
 for (f in files) {
   base <- sub("\\.(tsv|txt|csv)(\\.gz)?$", "", basename(f))
   out_path <- file.path(OUT, paste0(base, ".tsv.gz"))
-  if (file.exists(out_path) && !FORCE) {
-    message(sprintf("[skip] %s (output exists)", base)); n_skip <- n_skip + 1L; next
-  }
 
   message(sprintf("[munge] %s", base))
   munged_path <- file.path(munged_dir, paste0(base, ".munged.tsv.gz"))
@@ -229,7 +217,7 @@ for (f in files) {
       nThread              = THREADS,
       log_folder           = file.path(log_root, base),
       log_folder_ind       = TRUE,
-      force_new            = FORCE,
+      force_new            = TRUE,             # always re-munge (no reuse of old _munged files)
       return_data          = FALSE
     ),
     error = function(e) { message("    [FAIL munge] ", conditionMessage(e)); NULL }
@@ -252,6 +240,6 @@ for (f in files) {
   n_ok <- n_ok + 1L
 }
 
-message(sprintf("\nDONE.  %d munged, %d skipped, %d failed.  Output -> %s/",
-                n_ok, n_skip, n_fail, OUT))
+message(sprintf("\nDONE.  %d munged, %d failed.  Output -> %s/",
+                n_ok, n_fail, OUT))
 if (n_fail > 0) message("See per-file logs under ", log_root, "/ for failures.")
