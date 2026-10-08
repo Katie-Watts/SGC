@@ -13,8 +13,8 @@
 #   2. Reads the munged file back and rewrites it with standard column names
 #      plus a leading SNP_ID column
 #      (Chromosome:Position:Allele1:Allele2, alleles sorted alphabetically) that METAL uses
-#      as the marker key in the next step BUT METAL will use the real alleles in the analysis and output i.e in Effect_allele and Non_effect_allele.
-#      N_CAS / N_CON are passed through when the cohort supplies them, otherwise written as NA.
+#      as the marker key in the next step. N_CAS / N_CON are passed through
+#      when the cohort supplies them, otherwise written as NA.
 #   3. Writes <out_dir>/<same basename>.tsv.gz (tab-separated, gzipped).
 #      Drew - Rename files if needed.
 #
@@ -43,7 +43,7 @@ INFO_FILTER <- 0.3
 FRQ_FILTER  <- 0.005
 
 # Genome build handling: infer each cohort's build, then lift everything to
-# GRCh38 so all cohorts share coordinates before meta-analysis (backup check as Drew's code should handle this)
+# GRCh38 so all cohorts share coordinates before meta-analysis (as a backup check as Drew's code should handle this)
 REF_GENOME_DEFAULT <- NULL       # NULL = let MungeSumstats infer per file
 CONVERT_REF_TO     <- "GRCh38"   # target build for all outputs
 DBSNP_BUILD        <- 155        # dbSNP reference for SNP mapping
