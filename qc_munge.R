@@ -12,9 +12,9 @@
 #      where found. Variants not in dbSNP are kept; variants that fail liftover are dropped.
 #   2. Reads the munged file back and rewrites it with standard column names
 #      plus a leading SNP_ID column
-#      (Chromosome:Position:Effect_allele:Non-effect_allele) that METAL uses
-#      as the marker key in the next step. N_CAS / N_CON are passed through
-#      when the cohort supplies them, otherwise written as NA.
+#      (Chromosome:Position:Allele1:Allele2, alleles sorted alphabetically) that METAL uses
+#      as the marker key in the next step BUT METAL will use the real alleles in the analysis and output i.e in Effect_allele and Non_effect_allele.
+#      N_CAS / N_CON are passed through when the cohort supplies them, otherwise written as NA.
 #   3. Writes <out_dir>/<same basename>.tsv.gz (tab-separated, gzipped).
 #      Drew - Rename files if needed.
 #
@@ -152,6 +152,7 @@ standardise <- function(munged_path, out_path) {
   c_inf <- pick(dt, "INFO")
   c_cas <- pick(dt, "N_CAS")   # optional: written as NA if the cohort didn't supply it
   c_con <- pick(dt, "N_CON")
+  c_snp <- pick(dt, "SNP")     # rsID from dbSNP where found (MungeSumstats SNP column)
 
   # MAF filter: FRQ is the effect-allele freq, so fold it to catch rare variants
   # whichever allele is the effect allele. Rows with no FRQ are kept.
@@ -168,9 +169,16 @@ standardise <- function(munged_path, out_path) {
   ea  <- toupper(dt$A2)   # A2 = effect allele (MungeSumstats convention)
   oa  <- toupper(dt$A1)   # A1 = non-effect / reference allele
 
+  # Orientation-independent marker key: alleles sorted alphabetically so the
+  # same variant gets the same SNP_ID whichever allele a cohort calls "effect".
+  # METAL aligns betas itself using Effect_allele / Non-effect_allele.
+  a_lo <- pmin(ea, oa)
+  a_hi <- pmax(ea, oa)
+
   #Rename ouptut columns as needed / whatever we want but will then need updating in METAL script if changed
   out <- data.table::data.table( 
-    SNP_ID              = paste(chr, dt$BP, ea, oa, sep = ":"),
+    SNP_ID              = paste(chr, dt$BP, a_lo, a_hi, sep = ":"),
+    RSID                = if (!is.na(c_snp)) as.character(dt[[c_snp]]) else NA_character_,
     Chromosome          = chr,
     Position            = dt$BP,
     Effect_allele       = ea,
@@ -183,8 +191,13 @@ standardise <- function(munged_path, out_path) {
     N_CAS               = if (!is.na(c_cas)) as.numeric(dt[[c_cas]]) else NA_real_,
     N_CON               = if (!is.na(c_con)) as.numeric(dt[[c_con]]) else NA_real_
   )
-  data.table::fwrite(out, out_path, sep = "\t", quote = FALSE, na = "NA",
+  # Write to a temp file and rename only once complete, so a crash mid-write
+  # never leaves a truncated output that the resume check would then skip.
+  tmp <- paste0(out_path, ".tmp")
+  data.table::fwrite(out, tmp, sep = "\t", quote = FALSE, na = "NA",
                      compress = "gzip")
+  if (!file.rename(tmp, out_path))
+    stop("could not rename ", tmp, " to ", out_path)
   nrow(out)
 }
 
@@ -238,7 +251,7 @@ for (f in files) {
   message(sprintf("    [ok] %s  (%s variants)", basename(out_path),
                   format(n, big.mark = ",")))
   n_ok <- n_ok + 1L
-
+}
 
 message(sprintf("\nDONE.  %d munged, %d skipped, %d failed.  Output -> %s/",
                 n_ok, n_skip, n_fail, OUT))
