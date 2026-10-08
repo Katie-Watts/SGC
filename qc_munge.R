@@ -31,9 +31,8 @@
 #   --in PATH           directory, single file, or quoted glob (default: cohort_files)
 #   --out DIR           output directory (default: qc)
 #   --threads N         threads for MungeSumstats (default: 1)
-#   --mapping FILE      extra header map (.csv/.tsv/.xlsx; Uncorrected,Corrected)
+#   --mapping FILE      extra header map (.csv/.tsv; Uncorrected,Corrected)
 #   --ref-genome BUILD  force input build (GRCh37/GRCh38); default: infer per file
-#   -h, --help          show this header
 ###############################################################################
 
 # QC filters to impose(SGC standard)
@@ -52,8 +51,6 @@ DROP_NON_DBSNP     <- FALSE
 
 # ============================================================================
 
-STRATA <- c("ALL","EUR","AFR","AMR","EAS","SAS","MALE","FEMALE")
-
 # CLI args
 args <- commandArgs(trailingOnly = TRUE)
 
@@ -62,15 +59,6 @@ get_opt <- function(flag, default = NULL) {
   if (is.na(i)) return(default)
   if (i == length(args)) stop(sprintf("%s needs a value", flag))
   args[i + 1]
-}
-has_flag <- function(flag) flag %in% args
-
-if (has_flag("--help") || has_flag("-h")) {
-  lines <- readLines(sub("--file=", "",
-      grep("--file=", commandArgs(FALSE), value = TRUE)))
-  hdr_end <- which(!grepl("^#", lines))[1] - 1   # print the leading comment block only
-  cat(lines[2:hdr_end], sep = "\n")
-  quit(status = 0)
 }
 
 IN      <- get_opt("--in",  default = "cohort_files")
@@ -115,13 +103,7 @@ mapping_file <- unique(rbind(mapping_file,
 # remapping for SE
 # e.g. a "standard error" column with a space. Two columns: Uncorrected, Corrected.
 if (!is.null(MAPPING)) {
-  extra <- if (tolower(tools::file_ext(MAPPING)) %in% c("xlsx","xls")) {
-    if (!requireNamespace("readxl", quietly = TRUE))
-      stop("readxl needed to read ", MAPPING)
-    as.data.frame(readxl::read_excel(MAPPING))
-  } else {
-    as.data.frame(data.table::fread(MAPPING))
-  }
+  extra <- as.data.frame(data.table::fread(MAPPING))
   names(extra)[1:2] <- c("Uncorrected", "Corrected")
   extra$Uncorrected <- toupper(extra$Uncorrected)
   mapping_file <- unique(rbind(mapping_file, extra[, c("Uncorrected","Corrected")]))
@@ -217,7 +199,7 @@ for (f in files) {
       nThread              = THREADS,
       log_folder           = file.path(log_root, base),
       log_folder_ind       = TRUE,
-      force_new            = TRUE,             # always re-munge (no reuse of old _munged files)
+      force_new            = TRUE,             
       return_data          = FALSE
     ),
     error = function(e) { message("    [FAIL munge] ", conditionMessage(e)); NULL }
