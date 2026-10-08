@@ -9,8 +9,7 @@
 #      MungeSumstats' default map (effect_AF is mapped to FRQ explicitly as not a default option), so
 #      cohort files don't need pre-renaming. Each cohort's genome build is
 #      inferred and lifted to GRCh38; missing RSIDs are filled from dbSNP 155
-#      where found. Variants not in dbSNP are kept (set DROP_NON_DBSNP <- TRUE
-#      to drop them); variants that fail liftover are dropped.
+#      where found. Variants not in dbSNP are kept; variants that fail liftover are dropped.
 #   2. Reads the munged file back and rewrites it with standard column names
 #      plus a leading SNP_ID column
 #      (Chromosome:Position:Effect_allele:Non-effect_allele) that METAL uses
