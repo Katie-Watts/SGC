@@ -5,15 +5,17 @@
 #
 # The process (per cohort file)
 #   1. Runs MungeSumstats::format_sumstats() with the SGC QC filters
-#      (INFO >= 0.3, FRQ >= 0.005). Column headers are auto-detected from
+#      (INFO >= 0.3, FRQ >= 0.005; MAF >= 0.005 is applied in step 2). Column headers are auto-detected from
 #      MungeSumstats' default map (effect_AF is mapped to FRQ explicitly as not a default option), so
 #      cohort files don't need pre-renaming. Each cohort's genome build is
 #      inferred and lifted to GRCh38; missing RSIDs are filled from dbSNP 155
-#      (variants not in dbSNP are still kept).
+#      where found. Variants not in dbSNP are kept (set DROP_NON_DBSNP <- TRUE
+#      to drop them); variants that fail liftover are dropped.
 #   2. Reads the munged file back and rewrites it with standard column names
 #      plus a leading SNP_ID column
 #      (Chromosome:Position:Effect_allele:Non-effect_allele) that METAL uses
-#      as the marker key in the next step.
+#      as the marker key in the next step. N_CAS / N_CON are passed through
+#      when the cohort supplies them, otherwise written as NA.
 #   3. Writes <out_dir>/<same basename>.tsv.gz (tab-separated, gzipped).
 #      Drew - Rename files if needed.
 #
@@ -149,6 +151,19 @@ standardise <- function(munged_path, out_path) {
 
   c_frq <- pick(dt, "FRQ")
   c_inf <- pick(dt, "INFO")
+  c_cas <- pick(dt, "N_CAS")   # optional: written as NA if the cohort didn't supply it
+  c_con <- pick(dt, "N_CON")
+
+  # MAF filter: FRQ is the effect-allele freq, so fold it to catch rare variants
+  # whichever allele is the effect allele. Rows with no FRQ are kept.
+  if (!is.na(c_frq)) {
+    frq  <- as.numeric(dt[[c_frq]])
+    keep <- is.na(frq) | pmin(frq, 1 - frq) >= FRQ_FILTER
+    if (any(!keep))
+      message(sprintf("    [MAF] dropped %s variant(s) with MAF < %s",
+                      format(sum(!keep), big.mark = ","), FRQ_FILTER))
+    dt <- dt[keep]
+  }
 
   chr <- sub("^chr", "", as.character(dt$CHR), ignore.case = TRUE)
   ea  <- toupper(dt$A2)   # A2 = effect allele (MungeSumstats convention)
@@ -165,9 +180,79 @@ standardise <- function(munged_path, out_path) {
     SE                  = dt$SE,
     `P-value`           = dt$P,
     Effect_AF           = if (!is.na(c_frq)) as.numeric(dt[[c_frq]]) else NA_real_,  # A2 freq
-    Imp_Quality         = if (!is.na(c_inf)) dt[[c_inf]] else NA_real_
+    Imp_Quality         = if (!is.na(c_inf)) dt[[c_inf]] else NA_real_,
+    N_CAS               = if (!is.na(c_cas)) as.numeric(dt[[c_cas]]) else NA_real_,
+    N_CON               = if (!is.na(c_con)) as.numeric(dt[[c_con]]) else NA_real_
   )
   data.table::fwrite(out, out_path, sep = "\t", quote = FALSE, na = "NA",
                      compress = "gzip")
   nrow(out)
 }
+
+# ------------------------------------------------------------------ main loop
+n_ok <- 0L; n_skip <- 0L; n_fail <- 0L; checked <- FALSE
+for (f in files) {
+  base <- sub("\\.(tsv|txt|csv)(\\.gz)?$", "", basename(f))
+  out_path <- file.path(OUT, paste0(base, ".tsv.gz"))
+  if (file.exists(out_path) && !FORCE) {
+    message(sprintf("[skip] %s (output exists)", base)); n_skip <- n_skip + 1L; next
+  }
+
+  message(sprintf("[munge] %s", base))
+  munged_path <- file.path(munged_dir, paste0(base, ".munged.tsv.gz"))
+  res <- tryCatch(
+    MungeSumstats::format_sumstats(
+      path                 = f,
+      save_path            = munged_path,
+      ref_genome           = REFG,
+      convert_ref_genome   = CONVERT_REF_TO,
+      dbSNP                = DBSNP_BUILD,
+      on_ref_genome        = DROP_NON_DBSNP,   # FALSE = keep SNPs not found in dbSNP
+      INFO_filter          = INFO_FILTER,
+      FRQ_filter           = FRQ_FILTER,
+      bi_allelic_filter    = TRUE,
+      allele_flip_check    = TRUE,
+      N_dropNA             = FALSE,
+      snp_ids_are_rs_ids   = FALSE,
+      mapping_file         = mapping_file,
+      nThread              = THREADS,
+      log_folder           = file.path(log_root, base),
+      log_folder_ind       = TRUE,
+      force_new            = FORCE,
+      return_data          = FALSE
+    ),
+    error = function(e) { message("    [FAIL munge] ", conditionMessage(e)); NULL }
+  )
+  if (is.null(res)) { n_fail <- n_fail + 1L; next }
+
+  # format_sumstats returns the save path (character) or, with log_folder_ind,
+  # a list whose $sumstats is that path.
+  mp <- if (is.list(res)) res$sumstats else res
+  if (is.null(mp) || !file.exists(mp)) {
+    message("    [FAIL] munged file not found"); n_fail <- n_fail + 1L; next
+  }
+
+  n <- tryCatch(standardise(mp, out_path),
+                error = function(e) { message("    [FAIL standardise] ",
+                                              conditionMessage(e)); NA })
+  if (is.na(n)) { n_fail <- n_fail + 1L; next }
+  message(sprintf("    [ok] %s  (%s variants)", basename(out_path),
+                  format(n, big.mark = ",")))
+  n_ok <- n_ok + 1L
+
+  # optional one-file spot check of the allele convention
+  if (CHECK_N > 0 && !checked) {
+    dt <- data.table::fread(mp, nrows = CHECK_N)
+    cc <- intersect(c("SNP","CHR","BP","A1","A2","BETA","OR","FRQ"), names(dt))
+    message("\n---- allele spot check (first ", CHECK_N, " rows of ",
+            base, ") ----")
+    message("   A2 = effect allele, FRQ = A2 (effect-allele) frequency.")
+    print(dt[, ..cc])
+    message("---- confirm A2/FRQ match the cohort's effect_allele/effect_AF ----\n")
+    checked <- TRUE
+  }
+}
+
+message(sprintf("\nDONE.  %d munged, %d skipped, %d failed.  Output -> %s/",
+                n_ok, n_skip, n_fail, OUT))
+if (n_fail > 0) message("See per-file logs under ", log_root, "/ for failures.")
