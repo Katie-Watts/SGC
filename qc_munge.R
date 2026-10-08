@@ -154,8 +154,7 @@ standardise <- function(munged_path, out_path) {
   c_con <- pick(dt, "N_CON")
   c_snp <- pick(dt, "SNP")     # rsID from dbSNP where found (MungeSumstats SNP column)
 
-  # MAF filter: FRQ is the effect-allele freq, so fold it to catch rare variants
-  # whichever allele is the effect allele. Rows with no FRQ are kept.
+  # MAF filter: FRQ is the effect-allele freq, Rows with no FRQ are kept.
   if (!is.na(c_frq)) {
     frq  <- as.numeric(dt[[c_frq]])
     keep <- is.na(frq) | pmin(frq, 1 - frq) >= FRQ_FILTER
