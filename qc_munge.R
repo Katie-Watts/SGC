@@ -43,7 +43,7 @@ INFO_FILTER <- 0.3
 FRQ_FILTER  <- 0.005
 
 # Genome build handling: infer each cohort's build, then lift everything to
-# GRCh38 so all cohorts share coordinates before meta-analysis (backup only as Drew's code should handle this now)
+# GRCh38 so all cohorts share coordinates before meta-analysis (backup check as Drew's code should handle this)
 REF_GENOME_DEFAULT <- NULL       # NULL = let MungeSumstats infer per file
 CONVERT_REF_TO     <- "GRCh38"   # target build for all outputs
 DBSNP_BUILD        <- 155        # dbSNP reference for SNP mapping
