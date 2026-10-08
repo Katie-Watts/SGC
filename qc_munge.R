@@ -239,18 +239,6 @@ for (f in files) {
                   format(n, big.mark = ",")))
   n_ok <- n_ok + 1L
 
-  # optional one-file spot check of the allele convention
-  if (CHECK_N > 0 && !checked) {
-    dt <- data.table::fread(mp, nrows = CHECK_N)
-    cc <- intersect(c("SNP","CHR","BP","A1","A2","BETA","OR","FRQ"), names(dt))
-    message("\n---- allele spot check (first ", CHECK_N, " rows of ",
-            base, ") ----")
-    message("   A2 = effect allele, FRQ = A2 (effect-allele) frequency.")
-    print(dt[, ..cc])
-    message("---- confirm A2/FRQ match the cohort's effect_allele/effect_AF ----\n")
-    checked <- TRUE
-  }
-}
 
 message(sprintf("\nDONE.  %d munged, %d skipped, %d failed.  Output -> %s/",
                 n_ok, n_skip, n_fail, OUT))
