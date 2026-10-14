@@ -191,7 +191,7 @@ for (f in files) {
       on_ref_genome        = DROP_NON_DBSNP,   # FALSE = keep SNPs not found in dbSNP
       INFO_filter          = INFO_FILTER,
       FRQ_filter           = FRQ_FILTER,
-      bi_allelic_filter    = TRUE,
+      bi_allelic_filter    = FALSE,
       allele_flip_check    = TRUE,
       N_dropNA             = FALSE,
       snp_ids_are_rs_ids   = FALSE,
