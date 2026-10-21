@@ -7,6 +7,7 @@
 SCHEME   STDERR          # fixed-effect, inverse-variance weighted (beta + SE)
 AVERAGEFREQ ON           # carry a weighted Effect_AF into the output
 MINMAXFREQ  ON           # also report min/max freq across cohorts
+OVERLAP ON
 
 # --- Define custom variables to track cases and controls ---
 CUSTOMVARIABLE Ncases
