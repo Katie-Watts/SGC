@@ -4,7 +4,7 @@
 # run using: metal example_single.metal
 # ==========================================================================
 
-SCHEME   STDERR          # fixed-effect, inverse-variance weighted (beta + SE)
+SCHEME   STDERR          # fixed-effect, inverse-variance weighted (beta + SE), could do SAMPLESIZE as sensitivity ?
 AVERAGEFREQ ON           # carry a weighted Effect_AF into the output
 MINMAXFREQ  ON           # also report min/max freq across cohorts
 
