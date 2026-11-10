@@ -55,7 +55,7 @@ SUMMARY_HDR = re.compile(r"^\s*CHR\s+F\s+SNP\s+BP\s+P\s+TOTAL")
 INDEX_LINE = re.compile(r"^\s*\(INDEX\)")
 MEMBER_LINE = re.compile(r"^\s+[0-9XYMT]+:[0-9]+:")
 CHR_TOKEN = re.compile(r"^[0-9XYMT]+$")
-KNOWN_STRATA = {"ALL", "EUR", "AFR", "AMR", "EAS", "SAS", "MALE", "FEMALE"}
+KNOWN_STRATA = {"ALL", "EUR", "AFR", "AMR", "EAS", "SAS", "MID", "MALE", "FEMALE"}
 STRAT_ORD = {s: i for i, s in enumerate(
     ["ALL", "EUR", "AFR", "AMR", "EAS", "SAS", "MALE", "FEMALE"])}
 MHC_CHR, MHC_START, MHC_END = "6", 25_000_000, 34_000_000
